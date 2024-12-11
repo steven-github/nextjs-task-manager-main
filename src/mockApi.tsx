@@ -1,28 +1,23 @@
 import { Task } from "./types";
+import mockTasksData from "./mockTasks.json"; // Import the JSON file
 
-const mockTasks: Task[] = [
-    {
-        id: 1,
-        title: "Buy groceries",
-        description: "Milk, eggs, bread, and coffee",
-        status: "Pending",
-        createdAt: "2024-12-01T10:00:00Z",
-        updatedAt: "2024-12-01T10:00:00Z",
-    },
-    {
-        id: 2,
-        title: "Workout",
-        description: "1-hour cardio session",
-        status: "Completed",
-        createdAt: "2024-12-02T08:30:00Z",
-        updatedAt: "2024-12-03T09:15:00Z",
-    },
-];
+// Use the imported data instead of hardcoded tasks
+const mockTasks: Task[] = mockTasksData;
 
 // Fetch all tasks
-export const fetchTasks = async (): Promise<Task[]> => {
+export const fetchTasks1 = async (): Promise<Task[]> => {
     return new Promise((resolve) => {
         setTimeout(() => resolve([...mockTasks]), 500); // Simulate network delay
+    });
+};
+
+// Fetch tasks with pagination
+export const fetchTasks = async (page: number = 1, limit: number = 5): Promise<Task[]> => {
+    return new Promise((resolve) => {
+        const start = (page - 1) * limit;
+        const end = start + limit;
+        const paginatedTasks = mockTasks.slice(start, end);
+        setTimeout(() => resolve([...paginatedTasks]), 500); // Simulate network delay
     });
 };
 

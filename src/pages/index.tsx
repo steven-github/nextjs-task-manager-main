@@ -6,24 +6,58 @@ import { Task } from "@/types";
 export default function Home() {
     const [tasks, setTasks] = useState<Task[]>([]); // State for tasks
     const [form, setForm] = useState({ title: "", description: "", status: "Pending" }); // State for form
+    const [formErrors, setFormErrors] = useState({ title: "", description: "" }); // State for form validation errors
     const [editingTask, setEditingTask] = useState<Task | null>(null); // State for editing
+    const [page, setPage] = useState(1); // Current page for pagination
+    const [hasMore, setHasMore] = useState(true); // Tracks if there are more tasks to load
+    const [filterStatus, setFilterStatus] = useState<string>("All"); // Status filter
+    const TASKS_PER_PAGE = 5; // Number of tasks to load per page
 
-    // Fetch tasks on component mount
+    // Fetch tasks on component mount and when page changes
     useEffect(() => {
-        fetchTasks()
-            .then(setTasks)
-            .catch((err) => console.error("Error fetching tasks:", err));
-    }, []);
+        loadTasks(page);
+    }, [page]);
+
+    // Function to load tasks for the given page
+    const loadTasks = async (pageNumber: number) => {
+        try {
+            const newTasks = await fetchTasks(pageNumber, TASKS_PER_PAGE);
+            setTasks((prev) => [...prev, ...newTasks]);
+            if (newTasks.length < TASKS_PER_PAGE) {
+                setHasMore(false); // No more tasks to load
+            }
+        } catch (err) {
+            console.error("Error fetching tasks:", err);
+        }
+    };
 
     // Handle form input changes
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setForm({ ...form, [name]: value });
+        // Reset error when user types
+        setFormErrors({ ...formErrors, [name]: "" });
+    };
+
+    // **Form Validation Logic**
+    const validateForm = () => {
+        const errors: { title?: string; description?: string } = {};
+        if (!form.title.trim()) {
+            errors.title = "Title is required.";
+        }
+        if (form.description.trim().length < 5) {
+            errors.description = "Description must be at least 5 characters long.";
+        }
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0; // Return true if no errors
     };
 
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        const isValid = validateForm();
+        if (!isValid) return;
+
         if (editingTask) {
             // Update task
             const updatedTask = await updateTask(editingTask.id, form);
@@ -32,7 +66,7 @@ export default function Home() {
         } else {
             // Create new task
             const newTask = await createTask(form);
-            setTasks((prev) => [...prev, newTask]);
+            setTasks((prev) => [newTask, ...prev]); // Prepend new task to the top
         }
         setForm({ title: "", description: "", status: "Pending" });
     };
@@ -59,6 +93,30 @@ export default function Home() {
         setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
     };
 
+    // Handle "Load More" button click
+    const loadMoreTasks = () => {
+        setPage((prev) => prev + 1);
+    };
+
+    // Infinite Scroll: Automatically load more tasks when the user scrolls to the bottom
+    useEffect(() => {
+        const handleScroll = () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100 && hasMore) {
+                setPage((prev) => prev + 1);
+            }
+        };
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, [hasMore]);
+
+    // Filter tasks based on selected status
+    const filteredTasks = filterStatus === "All" ? tasks : tasks.filter((task) => task.status === filterStatus);
+
+    // Handle filter change
+    const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setFilterStatus(e.target.value);
+    };
+
     return (
         <div className='min-h-screen bg-gray-100 p-4'>
             <h1 className='text-3xl font-bold text-center mb-6'>Task Manager</h1>
@@ -70,28 +128,44 @@ export default function Home() {
                     value={form.title}
                     onChange={handleInputChange}
                     placeholder='Title'
-                    required
-                    className='w-full mb-4 p-2 border rounded-md'
+                    className={`w-full mb-2 p-2 border rounded-md ${formErrors.title ? "border-red-500" : "border-gray-300"}`}
                 />
+                {formErrors.title && <p className='text-red-500 text-sm mb-2'>{formErrors.title}</p>}
+
                 <textarea
                     name='description'
                     value={form.description}
                     onChange={handleInputChange}
                     placeholder='Description'
-                    className='w-full mb-4 p-2 border rounded-md'
+                    className={`w-full mb-2 p-2 border rounded-md ${formErrors.description ? "border-red-500" : "border-gray-300"}`}
                 />
+                {formErrors.description && <p className='text-red-500 text-sm mb-2'>{formErrors.description}</p>}
+
                 <select name='status' value={form.status} onChange={handleInputChange} className='w-full mb-4 p-2 border rounded-md'>
                     <option value='Pending'>Pending</option>
                     <option value='Completed'>Completed</option>
                 </select>
+
                 <button type='submit' className='w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600'>
                     {editingTask ? "Update Task" : "Create Task"}
                 </button>
             </form>
 
+            {/* Filter Dropdown */}
+            <div className='mb-4'>
+                <label htmlFor='status-filter' className='block font-bold mb-2'>
+                    Filter by Status
+                </label>
+                <select id='status-filter' value={filterStatus} onChange={handleFilterChange} className='w-full p-2 border rounded-md'>
+                    <option value='All'>All</option>
+                    <option value='Pending'>Pending</option>
+                    <option value='Completed'>Completed</option>
+                </select>
+            </div>
+
             {/* Task List */}
             <ul className='space-y-4'>
-                {tasks.map((task) => (
+                {filteredTasks.map((task) => (
                     <li key={task.id} className='bg-white p-4 shadow-md rounded-md flex items-center justify-between'>
                         <div>
                             <h2 className='text-lg font-bold'>{task.title}</h2>
@@ -117,6 +191,12 @@ export default function Home() {
                     </li>
                 ))}
             </ul>
+
+            {hasMore && (
+                <button onClick={loadMoreTasks} className='w-full bg-blue-500 text-white py-2 mt-4 rounded-md hover:bg-blue-600'>
+                    Load More
+                </button>
+            )}
         </div>
     );
 }
