@@ -39,16 +39,16 @@ export default function Home() {
         setFormErrors({ ...formErrors, [name]: "" });
     };
 
-    // **Form Validation Logic**
+    // Form Validation Logic
     const validateForm = () => {
-        const errors: { title?: string; description?: string } = {};
+        const errors: Partial<typeof formErrors> = {}; // Use Partial to allow optional keys
         if (!form.title.trim()) {
             errors.title = "Title is required.";
         }
         if (form.description.trim().length < 5) {
             errors.description = "Description must be at least 5 characters long.";
         }
-        setFormErrors(errors);
+        setFormErrors({ title: errors.title || "", description: errors.description || "" });
         return Object.keys(errors).length === 0; // Return true if no errors
     };
 
